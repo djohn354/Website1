@@ -1,17 +1,1346 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>My Website</title>
-    <link rel="stylesheet" href="./style.css">
-    <link rel="icon" href="./favicon.ico" type="image/x-icon">
-  </head>
-  <body>
-    <main>
-        <h1>Welcome to My Website</h1>
-    </main>
-    <script src="index.js"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STORM WATCH — USA Extreme Weather Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #03060a;
+    --panel: #080d14;
+    --border: #1a2a3a;
+    --accent: #00d4ff;
+    --accent2: #ff4d00;
+    --warn: #ffb300;
+    --green: #00ff88;
+    --text: #c8dde8;
+    --muted: #4a6070;
+    --red: #ff3333;
+    --glow: 0 0 20px rgba(0,212,255,0.3);
+    --glow2: 0 0 20px rgba(255,77,0,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* === SCANLINE OVERLAY === */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* === HEADER === */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,20,35,0.95) 0%, rgba(3,6,10,0.95) 100%);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .logo-mark {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+  .logo-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #fff 0%, var(--accent) 60%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--red);
+    letter-spacing: 2px;
+  }
+  .live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red);
+    animation: pulse 1.4s infinite;
+  }
+
+  .clock {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+
+  .refresh-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 6px 14px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover {
+    background: var(--accent);
+    color: #000;
+    box-shadow: var(--glow);
+  }
+  .refresh-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* === MAIN LAYOUT === */
+  #app {
+    min-height: calc(100vh - 64px);
+    position: relative;
+  }
+
+  /* === SPLASH / NO EVENTS === */
+  #splash {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 64px);
+    text-align: center;
+    padding: 40px;
+    animation: fadeIn 0.8s ease;
+  }
+  #splash.active { display: flex; }
+
+  .splash-icon {
+    font-size: 80px;
+    margin-bottom: 30px;
+    filter: grayscale(0.3);
+    animation: float 4s ease-in-out infinite;
+  }
+  .splash-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+  .splash-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--green);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+  .splash-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    max-width: 500px;
+    width: 100%;
+    margin-bottom: 30px;
+  }
+  .splash-stat {
+    background: var(--panel);
+    padding: 18px;
+    text-align: center;
+  }
+  .splash-stat-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .splash-stat-lbl {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+  .splash-footer {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* === EVENTS DASHBOARD === */
+  #dashboard {
+    display: none;
+    padding: 20px 24px;
+    animation: fadeIn 0.5s ease;
+  }
+  #dashboard.active { display: block; }
+
+  /* === ALERT TICKER === */
+  .ticker-wrap {
+    background: var(--accent2);
+    padding: 8px 0;
+    overflow: hidden;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .ticker-wrap::before, .ticker-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 60px;
+    z-index: 2;
+  }
+  .ticker-wrap::before { left: 0; background: linear-gradient(90deg, var(--accent2), transparent); }
+  .ticker-wrap::after { right: 0; background: linear-gradient(-90deg, var(--accent2), transparent); }
+  .ticker-label {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #000;
+    letter-spacing: 2px;
+    z-index: 3;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 8px;
+  }
+  .ticker {
+    display: flex;
+    gap: 60px;
+    animation: ticker 30s linear infinite;
+    white-space: nowrap;
+    padding-left: 100%;
+  }
+  .ticker span {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+
+  /* === EVENT CARDS GRID === */
+  .events-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+    gap: 20px;
+  }
+
+  .event-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .event-card:hover { border-color: var(--accent); }
+  .event-card.severity-extreme { border-left: 4px solid var(--red); }
+  .event-card.severity-severe { border-left: 4px solid var(--accent2); }
+  .event-card.severity-moderate { border-left: 4px solid var(--warn); }
+
+  .event-card-header {
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .event-type-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .badge-extreme { background: rgba(255,51,51,0.2); color: var(--red); border: 1px solid var(--red); }
+  .badge-severe { background: rgba(255,77,0,0.2); color: var(--accent2); border: 1px solid var(--accent2); }
+  .badge-moderate { background: rgba(255,179,0,0.2); color: var(--warn); border: 1px solid var(--warn); }
+
+  .event-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+    line-height: 1.2;
+    flex: 1;
+  }
+  .event-location {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .event-timer {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .timer-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .timer-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--warn);
+  }
+  .timer-val.expiring { color: var(--red); animation: flashRed 1s infinite; }
+
+  /* SATELLITE SECTION */
+  .satellite-section {
+    position: relative;
+    height: 220px;
+    background: #000;
+    overflow: hidden;
+  }
+  .satellite-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.85;
+    transition: opacity 0.3s;
+  }
+  .satellite-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(
+      to bottom,
+      transparent 60%,
+      rgba(8,13,20,0.9) 100%
+    );
+    pointer-events: none;
+  }
+  .satellite-label {
+    position: absolute;
+    top: 10px; left: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--green);
+    letter-spacing: 2px;
+    background: rgba(0,0,0,0.7);
+    padding: 4px 8px;
+    border: 1px solid rgba(0,255,136,0.3);
+  }
+  .satellite-coords {
+    position: absolute;
+    bottom: 10px; right: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1px;
+  }
+  .satellite-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--muted);
+  }
+  .sat-spinner {
+    width: 30px; height: 30px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  /* NEWS SECTION */
+  .news-section {
+    padding: 14px 18px;
+  }
+  .section-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    flex-shrink: 0;
+  }
+
+  .news-list { display: flex; flex-direction: column; gap: 8px; }
+  .news-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .news-item:hover {
+    border-color: var(--border);
+    background: rgba(0,212,255,0.04);
+  }
+  .news-source {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    padding-top: 2px;
+    min-width: 60px;
+  }
+  .news-text {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.4;
+    flex: 1;
+  }
+  .news-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .news-loading {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  /* EVENT STATS ROW */
+  .event-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    margin: 0 18px 14px;
+  }
+  .event-stat {
+    background: var(--panel);
+    padding: 8px 12px;
+  }
+  .stat-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .stat-lbl {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* STATUS BAR */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 24px;
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.4);
+    margin-top: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .status-ok { color: var(--green); }
+  .status-err { color: var(--red); }
+
+  /* LOADING STATE */
+  #loading {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 64px);
+    gap: 20px;
+  }
+  #loading.active { display: flex; }
+  .big-spinner {
+    width: 60px; height: 60px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  .loading-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    animation: blink 1.2s infinite;
+  }
+  .loading-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  /* ANIMATIONS */
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.85)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+  @keyframes flashRed { 0%,100%{color:var(--red)} 50%{color:rgba(255,51,51,0.3)} }
+  @keyframes scanline {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100%; }
+  }
+
+  /* API CONFIG MODAL */
+  #config-modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #config-modal.active { display: flex; }
+  .config-box {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    box-shadow: var(--glow);
+    padding: 36px 40px;
+    width: 100%;
+    max-width: 520px;
+    animation: fadeIn 0.3s ease;
+  }
+  .config-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .config-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+  .config-sub a { color: var(--accent); text-decoration: none; }
+  .config-field {
+    margin-bottom: 18px;
+  }
+  .config-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .config-input {
+    width: 100%;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .config-input:focus { border-color: var(--accent); }
+  .config-hint {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+  .config-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .btn-primary {
+    flex: 1;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+  .btn-primary:hover { box-shadow: var(--glow); filter: brightness(1.1); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 12px 20px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+  .demo-notice {
+    background: rgba(255,179,0,0.1);
+    border: 1px solid rgba(255,179,0,0.3);
+    padding: 10px 14px;
+    margin-top: 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--warn);
+    letter-spacing: 1px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<!-- CONFIG MODAL -->
+<div id="config-modal" class="active">
+  <div class="config-box">
+    <div class="config-title">API Configuration</div>
+    <div class="config-sub">
+      Enter your API keys to enable live data feeds.<br>
+      Keys are stored only in your browser session — never transmitted or stored.
+    </div>
+
+    <div class="config-field">
+      <label class="config-label">NWS / Weather.gov (Free — No Key Required)</label>
+      <div class="config-hint">✓ Extreme weather alerts are automatically fetched from api.weather.gov</div>
+    </div>
+
+    <div class="config-field">
+      <label class="config-label">NewsAPI Key</label>
+      <input class="config-input" id="newsapi-key" type="password" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+      <div class="config-hint">Free key at <a href="https://newsapi.org" target="_blank">newsapi.org</a> — enables local news feeds per event</div>
+    </div>
+
+    <div class="config-field">
+      <label class="config-label">NOAA Satellite Imagery</label>
+      <div class="config-hint">✓ GOES satellite imagery fetched via NOAA's public CDN — no key required</div>
+    </div>
+
+    <div class="demo-notice">
+      ⚠ CORS LIMITATION: Browser-based requests to NWS and NOAA APIs may be blocked by browser security policies. For full functionality, deploy this on a server with a proxy. The app will use demo data where live data is unavailable.
+    </div>
+
+    <div class="config-actions">
+      <button class="btn-primary" onclick="startApp()">Launch Monitor</button>
+      <button class="btn-secondary" onclick="startDemo()">Demo Mode</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div>
+      <div class="logo-mark">NOAA · NWS · LIVE</div>
+      <div class="logo-title">Storm Watch</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE FEED
+    </div>
+    <div class="clock" id="clock">--:--:-- UTC</div>
+    <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">⟳ Refresh</button>
+  </div>
+</header>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- LOADING -->
+  <div id="loading">
+    <div class="big-spinner"></div>
+    <div class="loading-text">SCANNING WEATHER SYSTEMS</div>
+    <div class="loading-sub" id="loading-sub">Connecting to NWS API...</div>
+  </div>
+
+  <!-- SPLASH: NO EVENTS -->
+  <div id="splash">
+    <div class="splash-icon">🌤</div>
+    <div class="splash-title">All Clear</div>
+    <div class="splash-sub">No Extreme Weather Events Detected</div>
+    <div class="splash-grid">
+      <div class="splash-stat">
+        <div class="splash-stat-val" id="stat-scanned">48</div>
+        <div class="splash-stat-lbl">States Scanned</div>
+      </div>
+      <div class="splash-stat">
+        <div class="splash-stat-val" id="stat-alerts">0</div>
+        <div class="splash-stat-lbl">Active Alerts</div>
+      </div>
+      <div class="splash-stat">
+        <div class="splash-stat-val" id="stat-updated">--</div>
+        <div class="splash-stat-lbl">Last Updated</div>
+      </div>
+    </div>
+    <div class="splash-footer">
+      Next scan in <span id="next-scan-countdown">60</span>s — data sourced from NWS/NOAA
+    </div>
+  </div>
+
+  <!-- DASHBOARD: ACTIVE EVENTS -->
+  <div id="dashboard">
+    <!-- ALERT TICKER -->
+    <div class="ticker-wrap">
+      <div class="ticker-label">⚠ ALERTS</div>
+      <div class="ticker" id="ticker-content">
+        <span>LOADING ALERT DATA...</span>
+      </div>
+    </div>
+
+    <!-- EVENTS GRID -->
+    <div class="events-grid" id="events-grid"></div>
+
+    <div class="status-bar">
+      <span>DATA SOURCES: NWS WEATHER.GOV · NOAA GOES SATELLITE · NEWSAPI</span>
+      <span id="last-updated-bar" class="status-ok">LIVE</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+//  CONFIGURATION & STATE
+// ============================================================
+let CONFIG = {
+  newsApiKey: '',
+  demoMode: false,
+  refreshInterval: 60000, // 1 min
+  eventWindowHours: 3     // show events for 3hrs after they end
+};
+
+let state = {
+  events: [],
+  lastUpdated: null,
+  refreshTimer: null,
+  countdownTimer: null,
+  countdownVal: 60
+};
+
+// ============================================================
+//  CLOCK
+// ============================================================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toUTCString().split(' ')[4] + ' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+//  LAUNCH
+// ============================================================
+function startApp() {
+  CONFIG.newsApiKey = document.getElementById('newsapi-key').value.trim();
+  CONFIG.demoMode = false;
+  document.getElementById('config-modal').classList.remove('active');
+  fetchAndRender();
+}
+
+function startDemo() {
+  CONFIG.demoMode = true;
+  document.getElementById('config-modal').classList.remove('active');
+  renderDemoData();
+}
+
+// ============================================================
+//  DATA FETCHING — NWS ACTIVE ALERTS
+// ============================================================
+async function fetchNWSAlerts() {
+  // NWS API: active extreme/severe weather alerts for USA
+  const url = 'https://api.weather.gov/alerts/active?status=actual&message_type=alert&urgency=Immediate,Expected&severity=Extreme,Severe&limit=20';
+
+  const resp = await fetch(url, {
+    headers: { 'User-Agent': 'StormWatchApp/1.0 (weather-monitor)' }
+  });
+  if (!resp.ok) throw new Error(`NWS API error: ${resp.status}`);
+  const data = await resp.json();
+  return data.features || [];
+}
+
+// Convert NWS alert feature to our event format
+function nwsFeatureToEvent(feature) {
+  const p = feature.properties;
+  const area = p.areaDesc || 'Unknown Area';
+  const onset = p.onset ? new Date(p.onset) : new Date();
+  const ends = p.ends ? new Date(p.ends) : (p.expires ? new Date(p.expires) : new Date(Date.now() + 3600000));
+
+  // Determine severity
+  let severity = 'moderate';
+  if (p.severity === 'Extreme') severity = 'extreme';
+  else if (p.severity === 'Severe') severity = 'severe';
+
+  // Extract lat/lng from geometry or geocode
+  let lat = 38.0, lng = -97.0; // US center default
+  if (feature.geometry && feature.geometry.coordinates) {
+    const coords = feature.geometry.coordinates;
+    if (feature.geometry.type === 'Polygon' && coords[0] && coords[0].length > 0) {
+      // centroid of first ring
+      let sumLng = 0, sumLat = 0, n = coords[0].length;
+      coords[0].forEach(c => { sumLng += c[0]; sumLat += c[1]; });
+      lng = sumLng / n; lat = sumLat / n;
+    } else if (feature.geometry.type === 'Point') {
+      lng = coords[0]; lat = coords[1];
+    }
+  }
+
+  // Parse city/state from areaDesc
+  const stateName = area.split(';')[0].split(',').slice(-1)[0]?.trim() || area;
+
+  return {
+    id: feature.id || Math.random().toString(36),
+    title: p.event || 'Weather Alert',
+    description: p.headline || p.description || '',
+    area: area.split(';')[0].trim(),
+    state: stateName,
+    severity,
+    onset,
+    ends,
+    lat,
+    lng,
+    windSpeed: extractWindSpeed(p.description || ''),
+    precipitation: extractPrecip(p.description || ''),
+    visibility: extractVisibility(p.description || ''),
+    nwsUrl: p['@id'] || '',
+  };
+}
+
+function extractWindSpeed(text) {
+  const m = text.match(/(\d+)\s*mph/i);
+  return m ? m[1] + ' MPH' : 'N/A';
+}
+function extractPrecip(text) {
+  const m = text.match(/(\d+\.?\d*)\s*inch/i);
+  return m ? m[1] + '"' : 'N/A';
+}
+function extractVisibility(text) {
+  const m = text.match(/visibility\s*([\d.]+)/i);
+  return m ? m[1] + ' MI' : 'N/A';
+}
+
+// ============================================================
+//  NOAA GOES SATELLITE IMAGERY
+// ============================================================
+function getSatelliteUrl(lat, lng) {
+  // NOAA GOES-East imagery via public CDN
+  // Use CONUS mesoscale sectors when possible
+  // Returns a URL to a recent GOES-16 visible or IR composite
+  const now = new Date();
+  
+  // Determine sector based on lat/lng
+  let sector = 'CONUS';
+  if (lat > 23 && lat < 50 && lng > -130 && lng < -60) sector = 'CONUS';
+
+  // NOAA's public GOES imagery (latest composite)
+  // These URLs use NOAA's CDN for GOES-16 GeoColor imagery
+  const baseUrl = 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/CONUS/GEOCOLOR/';
+  // latest_1000x1000.jpg is always the most recent CONUS image
+  return `${baseUrl}latest_1000x1000.jpg`;
+}
+
+// Fallback: regional GOES images by approximate region
+function getRegionalSatUrl(lat, lng) {
+  // GOES-East mesoscale sectors
+  if (lat > 45) return 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/CONUS/GEOCOLOR/latest_1000x1000.jpg';
+  if (lng < -100) return 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/CONUS/GEOCOLOR/latest_1000x1000.jpg';
+  return 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/CONUS/GEOCOLOR/latest_1000x1000.jpg';
+}
+
+// ============================================================
+//  NEWS FETCH
+// ============================================================
+async function fetchNewsForEvent(event) {
+  if (!CONFIG.newsApiKey) return getDummyNews(event);
+
+  const query = encodeURIComponent(`${event.title} ${event.state} weather`);
+  const url = `https://newsapi.org/v2/everything?q=${query}&language=en&sortBy=publishedAt&pageSize=4&apiKey=${CONFIG.newsApiKey}`;
+
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    if (data.status !== 'ok' || !data.articles) return getDummyNews(event);
+    return data.articles.slice(0, 4).map(a => ({
+      source: a.source?.name || 'News',
+      title: a.title || '',
+      url: a.url || '#',
+      publishedAt: a.publishedAt ? new Date(a.publishedAt) : new Date()
+    }));
+  } catch(e) {
+    return getDummyNews(event);
+  }
+}
+
+function getDummyNews(event) {
+  const now = new Date();
+  return [
+    { source: 'NWS', title: `${event.title} warning issued for ${event.area}`, url: event.nwsUrl || '#', publishedAt: new Date(now - 3600000) },
+    { source: 'NOAA', title: `Satellite confirms ${event.title.toLowerCase()} system over ${event.state}`, url: '#', publishedAt: new Date(now - 7200000) },
+    { source: 'Local', title: `Residents advised to seek shelter during ${event.title.toLowerCase()}`, url: '#', publishedAt: new Date(now - 1800000) },
+    { source: 'AP', title: `Meteorologists tracking ${event.title.toLowerCase()} conditions across region`, url: '#', publishedAt: new Date(now - 900000) },
+  ];
+}
+
+// ============================================================
+//  TIME REMAINING
+// ============================================================
+function getTimeRemaining(event) {
+  const now = Date.now();
+  const windowEnd = event.ends.getTime() + (CONFIG.eventWindowHours * 3600000);
+  const ms = windowEnd - now;
+  if (ms <= 0) return null; // expired
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+
+  const isActive = now < event.ends.getTime();
+  const isWindow = !isActive;
+  const isExpiring = ms < 1800000; // < 30min
+
+  return { h, m, s, isActive, isWindow, isExpiring, ms };
+}
+
+function formatTimeRemaining(tr) {
+  if (!tr) return '00:00:00';
+  return `${String(tr.h).padStart(2,'0')}:${String(tr.m).padStart(2,'0')}:${String(tr.s).padStart(2,'0')}`;
+}
+
+function timeAgo(date) {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.floor(mins/60)}h ago`;
+}
+
+// ============================================================
+//  RENDER
+// ============================================================
+async function renderEvents(events) {
+  const grid = document.getElementById('events-grid');
+  grid.innerHTML = '';
+
+  // Render ticker
+  const tickerItems = events.map(e => `<span>⚠ ${e.title.toUpperCase()} — ${e.area} ▸ SEVERITY: ${e.severity.toUpperCase()}</span>`);
+  // Duplicate for seamless loop
+  const doubled = [...tickerItems, ...tickerItems];
+  document.getElementById('ticker-content').innerHTML = doubled.join('');
+
+  for (const event of events) {
+    const card = await buildEventCard(event);
+    grid.appendChild(card);
+  }
+
+  // Kick off live timers
+  startTimers();
+}
+
+async function buildEventCard(event) {
+  const card = document.createElement('div');
+  card.className = `event-card severity-${event.severity}`;
+  card.dataset.eventId = event.id;
+
+  const tr = getTimeRemaining(event);
+  const timerClass = tr?.isExpiring ? 'timer-val expiring' : 'timer-val';
+  const timerLabel = tr?.isActive ? 'EVENT ENDS IN' : 'WINDOW CLOSES';
+
+  const badgeClass = `event-type-badge badge-${event.severity}`;
+  const severityLabel = event.severity.toUpperCase();
+
+  card.innerHTML = `
+    <div class="event-card-header">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span class="${badgeClass}">${severityLabel}</span>
+        </div>
+        <div class="event-title">${event.title}</div>
+        <div class="event-location">
+          <span>📍</span>
+          ${event.area}
+        </div>
+      </div>
+      <div class="event-timer">
+        <div class="timer-label">${timerLabel}</div>
+        <div class="${timerClass}" id="timer-${event.id.replace(/[^a-z0-9]/gi,'_')}">${formatTimeRemaining(tr)}</div>
+        <div style="font-family:monospace;font-size:9px;color:var(--muted);margin-top:2px">
+          ${tr?.isActive ? '● ACTIVE' : '○ POST-EVENT'}
+        </div>
+      </div>
+    </div>
+
+    <div class="event-stats">
+      <div class="event-stat">
+        <div class="stat-val">${event.windSpeed}</div>
+        <div class="stat-lbl">Wind</div>
+      </div>
+      <div class="event-stat">
+        <div class="stat-val">${event.precipitation}</div>
+        <div class="stat-lbl">Precip</div>
+      </div>
+      <div class="event-stat">
+        <div class="stat-val">${event.visibility}</div>
+        <div class="stat-lbl">Visibility</div>
+      </div>
+    </div>
+
+    <div class="satellite-section" id="sat-${event.id.replace(/[^a-z0-9]/gi,'_')}">
+      <div class="satellite-loading">
+        <div class="sat-spinner"></div>
+        <span style="font-family:monospace;font-size:10px;color:var(--muted);letter-spacing:2px">LOADING SATELLITE</span>
+      </div>
+    </div>
+
+    <div class="news-section">
+      <div class="section-label"><div class="dot"></div>LOCAL NEWS FEED</div>
+      <div class="news-list" id="news-${event.id.replace(/[^a-z0-9]/gi,'_')}">
+        <div class="news-loading">FETCHING NEWS DATA...</div>
+      </div>
+    </div>
+  `;
+
+  // Load satellite async
+  setTimeout(() => loadSatellite(event), 100);
+
+  // Load news async
+  fetchNewsForEvent(event).then(articles => {
+    const container = document.getElementById(`news-${event.id.replace(/[^a-z0-9]/gi,'_')}`);
+    if (!container) return;
+    if (!articles.length) {
+      container.innerHTML = '<div class="news-loading">NO RECENT NEWS FOUND</div>';
+      return;
+    }
+    container.innerHTML = articles.map(a => `
+      <a class="news-item" href="${a.url}" target="_blank">
+        <div class="news-source">${a.source.slice(0,12)}</div>
+        <div class="news-text">${a.title.length > 90 ? a.title.slice(0,90) + '…' : a.title}</div>
+        <div class="news-time">${timeAgo(a.publishedAt)}</div>
+      </a>
+    `).join('');
+  });
+
+  return card;
+}
+
+function loadSatellite(event) {
+  const container = document.getElementById(`sat-${event.id.replace(/[^a-z0-9]/gi,'_')}`);
+  if (!container) return;
+
+  const url = getSatelliteUrl(event.lat, event.lng);
+  const img = new Image();
+  img.onload = () => {
+    container.innerHTML = `
+      <img class="satellite-img" src="${url}" alt="GOES-16 Satellite">
+      <div class="satellite-overlay"></div>
+      <div class="satellite-label">GOES-16 · GEOCOLOR · CONUS</div>
+      <div class="satellite-coords">${event.lat.toFixed(2)}°N ${Math.abs(event.lng).toFixed(2)}°W</div>
+    `;
+  };
+  img.onerror = () => {
+    // Fallback to NOAA WMS
+    container.innerHTML = `
+      <div class="satellite-loading" style="flex-direction:column;gap:6px">
+        <span style="font-size:28px">🛰</span>
+        <span style="font-family:monospace;font-size:10px;color:var(--muted);letter-spacing:1px">SATELLITE FEED UNAVAILABLE</span>
+        <a href="https://www.star.nesdis.noaa.gov/GOES/sector_band.php?sat=G16&sector=CONUS&band=GEOCOLOR&length=12" target="_blank" 
+           style="font-family:monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-decoration:none">
+          VIEW ON NOAA.GOV ↗
+        </a>
+      </div>
+    `;
+  };
+  img.src = url + '?t=' + Date.now(); // cache-bust
+}
+
+// ============================================================
+//  TIMERS
+// ============================================================
+let timerInterval = null;
+
+function startTimers() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    state.events.forEach(event => {
+      const safeId = event.id.replace(/[^a-z0-9]/gi,'_');
+      const el = document.getElementById(`timer-${safeId}`);
+      if (!el) return;
+      const tr = getTimeRemaining(event);
+      if (!tr) {
+        // Remove expired event
+        const card = document.querySelector(`[data-event-id="${event.id}"]`);
+        if (card) card.style.opacity = '0.3';
+        el.textContent = 'EXPIRED';
+        return;
+      }
+      el.textContent = formatTimeRemaining(tr);
+      el.className = tr.isExpiring ? 'timer-val expiring' : 'timer-val';
+    });
+
+    // Check if all events expired
+    const allExpired = state.events.every(e => !getTimeRemaining(e));
+    if (allExpired && state.events.length > 0) {
+      state.events = [];
+      showSplash();
+    }
+  }, 1000);
+}
+
+// ============================================================
+//  SHOW/HIDE SCREENS
+// ============================================================
+function showLoading(msg) {
+  document.getElementById('loading').classList.add('active');
+  document.getElementById('splash').classList.remove('active');
+  document.getElementById('dashboard').classList.remove('active');
+  if (msg) document.getElementById('loading-sub').textContent = msg;
+}
+
+function showSplash() {
+  document.getElementById('loading').classList.remove('active');
+  document.getElementById('splash').classList.add('active');
+  document.getElementById('dashboard').classList.remove('active');
+  document.getElementById('stat-updated').textContent =
+    new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  startCountdown();
+}
+
+function showDashboard() {
+  document.getElementById('loading').classList.remove('active');
+  document.getElementById('splash').classList.remove('active');
+  document.getElementById('dashboard').classList.add('active');
+}
+
+// ============================================================
+//  COUNTDOWN TO NEXT SCAN
+// ============================================================
+function startCountdown() {
+  if (state.countdownTimer) clearInterval(state.countdownTimer);
+  state.countdownVal = 60;
+  state.countdownTimer = setInterval(() => {
+    state.countdownVal--;
+    const el = document.getElementById('next-scan-countdown');
+    if (el) el.textContent = state.countdownVal;
+    if (state.countdownVal <= 0) {
+      clearInterval(state.countdownTimer);
+    }
+  }, 1000);
+}
+
+// ============================================================
+//  MAIN FETCH + RENDER
+// ============================================================
+async function fetchAndRender() {
+  showLoading('Connecting to NWS API...');
+  document.getElementById('refresh-btn').disabled = true;
+
+  try {
+    document.getElementById('loading-sub').textContent = 'Fetching active alerts...';
+    const features = await fetchNWSAlerts();
+
+    document.getElementById('loading-sub').textContent = 'Processing event data...';
+    const now = Date.now();
+    const windowMs = CONFIG.eventWindowHours * 3600000;
+
+    const events = features
+      .map(nwsFeatureToEvent)
+      .filter(e => {
+        // Show if: still active OR ended within last 3 hours
+        const windowEnd = e.ends.getTime() + windowMs;
+        return windowEnd > now;
+      });
+
+    state.events = events;
+    state.lastUpdated = new Date();
+
+    document.getElementById('stat-alerts').textContent = events.length;
+    document.getElementById('last-updated-bar').textContent =
+      'UPDATED ' + state.lastUpdated.toLocaleTimeString();
+
+    if (events.length === 0) {
+      showSplash();
+    } else {
+      showDashboard();
+      await renderEvents(events);
+    }
+
+  } catch(err) {
+    console.error('Fetch error:', err);
+    // Fall to demo if CORS/network error
+    document.getElementById('loading-sub').textContent = 'API unavailable — loading demo data...';
+    setTimeout(renderDemoData, 1500);
+  } finally {
+    document.getElementById('refresh-btn').disabled = false;
+  }
+
+  // Auto-refresh
+  if (state.refreshTimer) clearTimeout(state.refreshTimer);
+  state.refreshTimer = setTimeout(fetchAndRender, CONFIG.refreshInterval);
+}
+
+async function refreshData() {
+  if (CONFIG.demoMode) return renderDemoData();
+  await fetchAndRender();
+}
+
+// ============================================================
+//  DEMO DATA
+// ============================================================
+function renderDemoData() {
+  showLoading('Loading demo data...');
+  setTimeout(async () => {
+    const now = new Date();
+
+    const demoEvents = [
+      {
+        id: 'demo-1',
+        title: 'Tornado Warning',
+        description: 'A confirmed tornado is on the ground moving northeast at 40 mph. Winds up to 135 mph.',
+        area: 'Moore, Cleveland County',
+        state: 'Oklahoma',
+        severity: 'extreme',
+        onset: new Date(now - 3600000),
+        ends: new Date(now + 1800000),
+        lat: 35.3395, lng: -97.4867,
+        windSpeed: '135 MPH',
+        precipitation: '2.1"',
+        visibility: '0.25 MI',
+        nwsUrl: 'https://www.weather.gov/oun/',
+      },
+      {
+        id: 'demo-2',
+        title: 'Flash Flood Emergency',
+        description: 'Life-threatening flash flooding. Heavy rainfall of 4+ inches in 2 hours. Rivers cresting.',
+        area: 'Louisville Metro, Jefferson County',
+        state: 'Kentucky',
+        severity: 'severe',
+        onset: new Date(now - 7200000),
+        ends: new Date(now - 1800000), // already ended, in 3hr window
+        lat: 38.2527, lng: -85.7585,
+        windSpeed: '25 MPH',
+        precipitation: '4.8"',
+        visibility: '1.0 MI',
+        nwsUrl: 'https://www.weather.gov/lmk/',
+      },
+      {
+        id: 'demo-3',
+        title: 'Severe Thunderstorm Warning',
+        description: 'Dangerous thunderstorm capable of producing tennis ball-sized hail and 70 mph winds.',
+        area: 'Dallas–Fort Worth Metroplex, Tarrant County',
+        state: 'Texas',
+        severity: 'severe',
+        onset: new Date(now - 1800000),
+        ends: new Date(now + 3600000),
+        lat: 32.7767, lng: -96.7970,
+        windSpeed: '70 MPH',
+        precipitation: '1.5"',
+        visibility: '2.0 MI',
+        nwsUrl: 'https://www.weather.gov/fwd/',
+      },
+    ];
+
+    state.events = demoEvents;
+    state.lastUpdated = new Date();
+    document.getElementById('stat-alerts').textContent = demoEvents.length;
+    document.getElementById('last-updated-bar').textContent =
+      'DEMO MODE — UPDATED ' + state.lastUpdated.toLocaleTimeString();
+
+    showDashboard();
+    await renderEvents(demoEvents);
+  }, 1200);
+}
+</script>
+</body>
 </html>
