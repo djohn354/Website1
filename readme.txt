@@ -1,1 +1,1 @@
-Test for server pull
+Test for server push
